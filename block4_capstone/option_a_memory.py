@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 client = anthropic.Anthropic()
-MODEL = "claude-sonnet-4-20250514"
+MODEL = "claude-sonnet-4-6"
 
 # ── Memory store (JSON file simulates a vector store / database) ──────────────
 
