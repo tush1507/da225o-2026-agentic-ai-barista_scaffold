@@ -189,15 +189,19 @@ def run_barista_agent(user_request: str) -> str:
 # ── 4. Try it ─────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    # Try these one at a time and observe the tool calls in the terminal
-    requests = [
-        "What oat milk drinks do you have?",
-        "I'd like a large Flat White with oat milk please.",   # out of stock
-        "Order me a medium Iced Latte with almond milk.",
-    ]
-
-    for req in requests:
-        run_barista_agent(req)
+    print("Barista Agent — type your order, or 'quit' to exit.\n")
+    while True:
+        try:
+            user_input = input("You: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nGoodbye!")
+            break
+        if not user_input:
+            continue
+        if user_input.lower() in ("quit", "exit"):
+            print("Goodbye!")
+            break
+        run_barista_agent(user_input)
         print()
 
     # ── EXERCISE ──────────────────────────────────────────────────────────
