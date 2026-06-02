@@ -1,0 +1,12 @@
+name: barista
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+    - anthropic
+    - langgraph
+    - fastapi
+    - uvicorn
+    - python-dotenv

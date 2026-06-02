@@ -3,8 +3,13 @@
 
 ### Setup
 ```bash
-pip install anthropic langgraph fastapi uvicorn
-export ANTHROPIC_API_KEY=sk-...
+# Create and activate the conda environment
+conda env create -f environment.yml
+conda activate barista
+
+# Copy the example env file and add your API key
+cp .env.example .env
+# edit .env and set ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ### Structure
