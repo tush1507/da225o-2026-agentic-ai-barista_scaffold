@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Setup
 
 ```bash
-pip install anthropic langgraph fastapi uvicorn python-dotenv
+pip install anthropic langgraph fastapi uvicorn python-dotenv mcp
 ```
 
 Copy `.env.example` to `.env` and fill in your key (`.env` is gitignored):

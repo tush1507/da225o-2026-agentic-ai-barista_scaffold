@@ -10,3 +10,4 @@ dependencies:
     - fastapi
     - uvicorn
     - python-dotenv
+    - mcp
