@@ -130,6 +130,31 @@ The while loop, the messages list, the stop_reason handling — all unchanged.
 
 ---
 
+## Inspecting the MCP server visually
+
+The **MCP Inspector** is a browser-based tool for exploring any MCP server — you can see every tool, its auto-generated schema, and call it manually without writing a client.
+
+```bash
+npx @modelcontextprotocol/inspector python block2_sdk/barista_mcp_server.py
+```
+
+This spawns the server and opens a web UI at `http://localhost:5173`. From there you can:
+- Browse all three tools (`get_menu`, `check_inventory`, `place_order`) and their input schemas
+- Call each tool with custom arguments and see the raw JSON response
+- Observe that `drink_name` has **no `enum` constraint** — FastMCP generates the schema from type hints alone, and `str` becomes an unconstrained string field
+
+That last point explains the bug this block was written around. When the model calls `check_inventory` with `"cold brew"` (lowercase), the schema offers no guidance on valid values, so the model passes whatever string it infers from the conversation. `_canonical()` in `barista_mcp_server.py` is the server-side fix; the Inspector is how you would diagnose the problem in the first place.
+
+Compare this to the hand-crafted schema in `agent_loop.py`:
+```python
+"drink_name": {"type": "string", "enum": ["Espresso", "Cold Brew", ...]}
+```
+The `enum` constrains the model to valid values before the call even reaches your code.
+
+> **Note:** `npx` requires Node.js (`brew install node` on macOS, or download from nodejs.org).
+
+---
+
 ## Files in this block
 
 | File | Role |

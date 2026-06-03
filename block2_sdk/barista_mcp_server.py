@@ -22,8 +22,14 @@ Transport: stdio (stdin/stdout pipe between client and server process).
 The server is spawned once per session by agent_loop_mcp.py and stays
 alive for the entire interactive session.
 
-You do NOT run this file directly. It is launched automatically by
-agent_loop_mcp.py.
+You do NOT run this file directly for normal use — it is launched automatically
+by agent_loop_mcp.py.
+
+To inspect the server visually, use the MCP Inspector:
+    npx @modelcontextprotocol/inspector python block2_sdk/barista_mcp_server.py
+This opens a browser UI at http://localhost:5173 where you can browse tool
+schemas and call tools interactively. Useful for understanding exactly what
+schema FastMCP auto-generates from @mcp.tool() decorators.
 """
 
 from mcp.server.fastmcp import FastMCP
