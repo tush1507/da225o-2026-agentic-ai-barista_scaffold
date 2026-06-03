@@ -14,7 +14,6 @@ Run:
 """
 
 import json
-import asyncio
 import time
 from langgraph.graph import StateGraph, END
 from typing import TypedDict, Optional
@@ -79,15 +78,25 @@ PRICES = {
 SIZE_MULTIPLIER = {"small": 0.85, "medium": 1.0, "large": 1.25}
 
 
+def _canonical(name: str) -> str:
+    """Case-insensitive drink name lookup."""
+    lower = name.lower()
+    for key in INVENTORY:
+        if key.lower() == lower:
+            return key
+    return name
+
+
 # ── InventoryAgent ────────────────────────────────────────────────────────────
 
 def inventory_agent(state: BaristaStateParallel) -> dict:
     """Check stock. In parallel execution, this runs concurrently with NutritionAgent."""
-    print(f"[InventoryAgent] Checking stock for {state['drink_name']}...")
+    drink = _canonical(state["drink_name"])
+    print(f"[InventoryAgent] Checking stock for {drink}...")
     time.sleep(0.3)  # simulate async I/O
 
-    available = INVENTORY.get(state["drink_name"], False)
-    msg = f"{state['drink_name']} is {'available' if available else 'OUT OF STOCK'}."
+    available = INVENTORY.get(drink, False)
+    msg = f"{drink} is {'available' if available else 'OUT OF STOCK'}."
     print(f"[InventoryAgent] {msg}")
     return {"in_stock": available, "stock_message": msg}
 
@@ -145,7 +154,7 @@ def nutrition_agent(state: BaristaStateParallel) -> dict:
                 if block.type != "tool_use":
                     continue
                 if block.name == "lookup_nutrition":
-                    nutrition = NUTRITION_DB.get(block.input["drink_name"], {"calories": 100, "caffeine_mg": 50})
+                    nutrition = NUTRITION_DB.get(_canonical(block.input["drink_name"]), {"calories": 100, "caffeine_mg": 50})
                     result = json.dumps(nutrition)
                 else:
                     result = json.dumps({"error": "unknown tool"})
@@ -237,28 +246,55 @@ def build_parallel_graph():
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 
+MENU_DRINKS = [
+    "Espresso", "Cappuccino", "Latte", "Flat White", "Americano",
+    "Cold Brew", "Iced Latte", "Frappuccino", "Iced Matcha",
+]
+
+
+def _parse_order(user_request: str) -> tuple[str, str, str]:
+    """Extract drink, size, and milk from a natural language request."""
+    req = user_request.lower()
+    drink = next((d for d in MENU_DRINKS if d.lower() in req), "Latte")
+    size = next((s for s in ["small", "medium", "large"] if s in req), "medium")
+    milk = next((m for m in ["oat", "almond", "soy", "whole"] if m in req), "whole")
+    return drink, size, milk
+
+
 if __name__ == "__main__":
     app = build_parallel_graph()
 
-    def run(drink: str, size: str = "medium", milk: str = "oat"):
+    def run(user_request: str):
+        drink, size, milk = _parse_order(user_request)
         print(f"\n{'='*60}")
         print(f"Order: {size} {drink} with {milk} milk")
         print(f"{'='*60}")
 
         t0 = time.time()
         state = app.invoke({
-            "user_request": f"I'd like a {size} {drink} with {milk} milk",
+            "user_request": user_request,
             "drink_name": drink, "size": size, "milk": milk,
             "in_stock": None, "stock_message": None,
             "calories": None, "caffeine_mg": None, "nutrition_summary": None,
             "final_price": None, "order_id": None, "response": None,
         })
         elapsed = time.time() - t0
-
         print(f"\nFinal ({elapsed:.1f}s): {state['response']}")
 
-    run("Cold Brew", "large", "oat")
-    run("Flat White", "medium", "whole")  # out of stock
+    print("Barista Agent (Parallel) — type your order, or 'quit' to exit.\n")
+    while True:
+        try:
+            user_input = input("You: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nGoodbye!")
+            break
+        if not user_input:
+            continue
+        if user_input.lower() in ("quit", "exit"):
+            print("Goodbye!")
+            break
+        run(user_input)
+        print()
 
     # ── EXERCISE ──────────────────────────────────────────────────────────
     # 1. Add a third parallel branch: AllergenAgent

@@ -13,7 +13,7 @@ Run:
 """
 
 import json
-import os
+import tempfile
 from pathlib import Path
 from langgraph.graph import StateGraph, END
 from typing import TypedDict, Optional
@@ -28,7 +28,7 @@ MODEL = "claude-sonnet-4-6"
 
 # ── Memory store (JSON file simulates a vector store / database) ──────────────
 
-MEMORY_FILE = Path("/tmp/barista_preferences.json")
+MEMORY_FILE = Path(tempfile.gettempdir()) / "barista_preferences.json"
 
 
 def load_preferences(user_id: str) -> dict:
@@ -207,14 +207,25 @@ if __name__ == "__main__":
         })
         print(f"\nFinal: {state['response']}")
 
-    # First visit — no history
-    run("user_42", "I'd like a large oat milk latte please.")
+    try:
+        user_id = input("Enter your user ID (e.g. alice): ").strip() or "guest"
+    except (EOFError, KeyboardInterrupt):
+        user_id = "guest"
 
-    # Second visit — memory kicks in
-    run("user_42", "The usual please.")
-
-    # Third visit — preference updated
-    run("user_42", "Actually, make it a cold brew today.")
+    print(f"\nWelcome, {user_id}! Type your order, or 'quit' to exit.\n")
+    while True:
+        try:
+            user_input = input("You: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nGoodbye!")
+            break
+        if not user_input:
+            continue
+        if user_input.lower() in ("quit", "exit"):
+            print("Goodbye!")
+            break
+        run(user_id, user_input)
+        print()
 
     # ── EXERCISE ──────────────────────────────────────────────────────────
     # Replace the JSON file with a SQLite or Redis store.

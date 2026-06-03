@@ -192,15 +192,31 @@ def build_surge_graph():
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 
+MENU_DRINKS = [
+    "Espresso", "Cappuccino", "Latte", "Flat White", "Americano",
+    "Cold Brew", "Iced Latte", "Frappuccino", "Iced Matcha",
+]
+
+
+def _parse_order(user_request: str) -> tuple[str, str, str]:
+    """Extract drink, size, and milk from a natural language request."""
+    req = user_request.lower()
+    drink = next((d for d in MENU_DRINKS if d.lower() in req), "Latte")
+    size = next((s for s in ["small", "medium", "large"] if s in req), "medium")
+    milk = next((m for m in ["oat", "almond", "soy", "whole"] if m in req), "whole")
+    return drink, size, milk
+
+
 if __name__ == "__main__":
     app = build_surge_graph()
 
-    def run(drink: str, size: str = "medium", milk: str = "oat"):
+    def run(user_request: str):
+        drink, size, milk = _parse_order(user_request)
         print(f"\n{'='*60}")
         print(f"Order: {size} {drink} with {milk} milk")
         print(f"{'='*60}")
         state = app.invoke({
-            "user_request": f"I'd like a {size} {drink} with {milk} milk",
+            "user_request": user_request,
             "drink_name": drink,
             "size": size,
             "milk": milk,
@@ -210,10 +226,20 @@ if __name__ == "__main__":
         })
         print(f"\nFinal: {state['response']}")
 
-    # Run several times — queue is random so you'll see different surge levels
-    run("Latte", "large", "oat")
-    run("Cold Brew", "medium", "almond")
-    run("Cappuccino", "small", "whole")
+    print("Barista Agent (Surge Pricing) — type your order, or 'quit' to exit.\n")
+    while True:
+        try:
+            user_input = input("You: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nGoodbye!")
+            break
+        if not user_input:
+            continue
+        if user_input.lower() in ("quit", "exit"):
+            print("Goodbye!")
+            break
+        run(user_input)
+        print()
 
     # ── EXERCISE ──────────────────────────────────────────────────────────
     # 1. Add a WeatherAgent before SurgeAgent.
