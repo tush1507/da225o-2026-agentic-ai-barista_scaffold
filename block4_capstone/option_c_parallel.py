@@ -109,7 +109,13 @@ NUTRITION_TOOLS = [
         "description": "Look up nutritional information for a drink.",
         "input_schema": {
             "type": "object",
-            "properties": {"drink_name": {"type": "string"}},
+            "properties": {
+                "drink_name": {
+                    "type": "string",
+                    "description": "The base drink name only — no size or milk modifier.",
+                    "enum": list(NUTRITION_DB.keys()),
+                }
+            },
             "required": ["drink_name"],
         },
     }
