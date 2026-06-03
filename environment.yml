@@ -11,3 +11,4 @@ dependencies:
     - uvicorn
     - python-dotenv
     - mcp
+    - rapidfuzz

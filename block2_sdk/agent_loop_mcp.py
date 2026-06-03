@@ -68,6 +68,10 @@ async def run_barista_agent(user_request: str) -> str:
                     system=(
                         "You are a friendly barista assistant. Help customers browse the menu, "
                         "check availability, and place orders. Always check inventory before placing an order."
+                        # Approach 3 — LLM-guided name resolution: uncomment the line below
+                        # and remove the _canonical() calls in barista_mcp_server.py.
+                        # " Always call get_menu first and use the drink name exactly as it"
+                        # " appears in the menu — preserve capitalisation and spelling."
                     ),
                     tools=tools,
                     messages=messages,

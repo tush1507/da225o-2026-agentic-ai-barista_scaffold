@@ -17,6 +17,37 @@ mcp = FastMCP("Barista")
 
 # ── Data (same as agent_loop.py) ──────────────────────────────────────────────
 
+# ── Drink name resolution — three approaches, swap to compare ─────────────────
+#
+# APPROACH 1 (active): case-insensitive exact match.
+#   Handles capitalisation differences only. Fast, zero dependencies.
+#
+# APPROACH 2 (classical NLP): fuzzy match via rapidfuzz.
+#   Handles typos and near-matches. Swap _canonical for _canonical_fuzzy below.
+#   Requires: pip install rapidfuzz
+#
+# APPROACH 3 (LLM): instruct the model via the system prompt in agent_loop_mcp.py.
+#   Add this sentence to the system prompt:
+#     "Always call get_menu first and use the drink name exactly as it appears
+#      in the menu — preserve capitalisation and spelling."
+#   The model resolves ambiguity itself before ever calling check_inventory.
+
+def _canonical(name: str) -> str:
+    """Approach 1 — case-insensitive exact match."""
+    lower = name.lower()
+    for key in INVENTORY:
+        if key.lower() == lower:
+            return key
+    return name  # unknown drink — pass through so callers get a clear False
+
+
+# def _canonical(name: str) -> str:
+#     """Approach 2 — fuzzy match (handles typos). Requires: pip install rapidfuzz"""
+#     from rapidfuzz import process
+#     match, score, _ = process.extractOne(name, INVENTORY.keys())
+#     return match if score >= 80 else name
+
+
 MENU = {
     "hot": ["Espresso", "Cappuccino", "Latte", "Flat White", "Americano"],
     "cold": ["Cold Brew", "Iced Latte", "Frappuccino", "Iced Matcha"],
@@ -56,6 +87,7 @@ def check_inventory(drink_name: str) -> dict:
     Args:
         drink_name: Name of the drink to check.
     """
+    drink_name = _canonical(drink_name)
     available = INVENTORY.get(drink_name, False)
     return {"drink": drink_name, "available": available}
 
@@ -69,6 +101,7 @@ def place_order(drink_name: str, size: str, milk: str = "whole") -> dict:
         size: Size of the drink. One of: small, medium, large.
         milk: Milk preference. One of: whole, oat, almond, soy, none.
     """
+    drink_name = _canonical(drink_name)
     if not INVENTORY.get(drink_name, False):
         return {"success": False, "reason": f"{drink_name} is not in stock."}
     ORDER_COUNTER[0] += 1
