@@ -46,14 +46,20 @@ def run(user_request: str):
 if __name__ == "__main__":
     print_graph_structure()
 
-    # Happy path — valid order, in stock
-    run("I'd like a large Iced Latte with oat milk please.")
-
-    # Out-of-stock path
-    run("Can I get a medium Flat White?")
-
-    # Invalid order path
-    run("I'd like a pizza please.")
+    print("Barista Agent (LangGraph) — type your order, or 'quit' to exit.\n")
+    while True:
+        try:
+            user_input = input("You: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nGoodbye!")
+            break
+        if not user_input:
+            continue
+        if user_input.lower() in ("quit", "exit"):
+            print("Goodbye!")
+            break
+        run(user_input)
+        print()
 
     # ── EXERCISE ──────────────────────────────────────────────────────────
     # 1. Add a LoyaltyAgent between InventoryAgent and BillingAgent.

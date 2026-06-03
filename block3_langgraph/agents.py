@@ -9,7 +9,6 @@ system prompt, tools, and single responsibility.
 """
 
 import json
-import re
 import anthropic
 from dotenv import load_dotenv
 from state import BaristaState
@@ -39,6 +38,15 @@ PRICES = {
 }
 SIZE_MULTIPLIER = {"small": 0.85, "medium": 1.0, "large": 1.25}
 ORDER_COUNTER = [2000]
+
+
+def _canonical(name: str) -> str:
+    """Case-insensitive drink name lookup — see block2 for fuzzy/LLM alternatives."""
+    lower = name.lower()
+    for key in INVENTORY:
+        if key.lower() == lower:
+            return key
+    return name
 
 
 # ── OrderAgent ────────────────────────────────────────────────────────────────
@@ -191,9 +199,10 @@ def inventory_agent(state: BaristaState) -> dict:
                 if block.type != "tool_use":
                     continue
                 if block.name == "check_stock":
-                    available = INVENTORY.get(block.input["drink_name"], False)
+                    drink = _canonical(block.input["drink_name"])
+                    available = INVENTORY.get(drink, False)
                     stock_result = available
-                    result = json.dumps({"drink": block.input["drink_name"], "available": available})
+                    result = json.dumps({"drink": drink, "available": available})
                 else:
                     result = json.dumps({"error": "unknown tool"})
                 results.append({"type": "tool_result", "tool_use_id": block.id, "content": result})
