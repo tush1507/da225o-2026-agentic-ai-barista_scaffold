@@ -244,6 +244,11 @@ def inventory_agent(state: BaristaState) -> dict:
                     "stock_error": None if stock_result else f"{state['drink_name']} is currently out of stock.",
                 }
 
+        else:
+            break  # unexpected stop_reason — exit loop
+
+    return {"in_stock": False, "stock_error": "Could not verify inventory."}
+
 
 # ── BillingAgent ──────────────────────────────────────────────────────────────
 

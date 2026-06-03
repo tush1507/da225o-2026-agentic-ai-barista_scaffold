@@ -15,7 +15,8 @@ cp .env.example .env
 ### Structure
 ```
 barista_scaffold/
-├── block1_concepts/        # No code needed — concepts only
+├── block1_concepts/
+│   └── README.md           # Foundational concepts — agents, tools, state, MCP
 ├── block2_sdk/
 │   ├── agent_loop.py           # Raw Anthropic SDK agent loop
 │   ├── agent_loop_mcp.py       # Same loop, tools served via MCP
