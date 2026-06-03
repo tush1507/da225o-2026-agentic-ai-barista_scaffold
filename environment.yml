@@ -12,3 +12,6 @@ dependencies:
     - python-dotenv
     - mcp
     - rapidfuzz
+    - langsmith
+    - "arize-phoenix[evals]"
+    - openinference-instrumentation-anthropic

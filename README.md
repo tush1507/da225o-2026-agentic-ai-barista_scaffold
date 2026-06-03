@@ -13,6 +13,7 @@ A teaching scaffold that builds a barista ordering system across four blocks, ea
 | **Block 2** | Single-agent barista (SDK) | The raw `while True` loop, tool schemas, `stop_reason`, MCP protocol |
 | **Block 3** | Three-agent pipeline (LangGraph) | Shared state, specialist agents, conditional routing |
 | **Block 4** | Extended patterns (pick one) | Long-term memory, dynamic tool injection, parallel fan-out |
+| **Block 5** | Observability + evaluation | Tracing with LangSmith and Phoenix, LLM-as-judge evaluation |
 
 Read each block's `.md` explainer before running the code.
 
@@ -51,6 +52,10 @@ python block3_langgraph/run.py
 python block4_patterns/option_a_memory.py   # long-term preference memory
 python block4_patterns/option_b_surge.py    # surge pricing via shared state
 python block4_patterns/option_c_parallel.py # parallel inventory + nutrition check
+
+# Block 5 — pick one evaluation approach
+python block5_evals/option_a_langsmith.py   # LangSmith: auto-tracing + dataset eval
+python block5_evals/option_b_phoenix.py     # Phoenix: local tracing + LLM-as-judge eval
 ```
 
 ---
@@ -72,9 +77,13 @@ barista_scaffold/
 │   ├── graph.py                # StateGraph wiring and conditional routing
 │   ├── run.py                  # Entry point
 │   └── LangGraph.md            # Explainer: nodes, edges, state, routing
-└── block4_patterns/
-    ├── option_a_memory.py      # PreferenceAgent reads/writes a JSON memory store
-    ├── option_b_surge.py       # SurgeAgent injects surge_multiplier into shared state
-    ├── option_c_parallel.py    # Fan-out: inventory and nutrition checked in parallel
-    └── Patterns.md             # Explainer: memory, signal injection, parallel fan-out
+├── block4_patterns/
+│   ├── option_a_memory.py      # PreferenceAgent reads/writes a JSON memory store
+│   ├── option_b_surge.py       # SurgeAgent injects surge_multiplier into shared state
+│   ├── option_c_parallel.py    # Fan-out: inventory and nutrition checked in parallel
+│   └── Patterns.md             # Explainer: memory, signal injection, parallel fan-out
+└── block5_evals/
+    ├── option_a_langsmith.py   # LangSmith: auto-tracing via env vars + dataset eval
+    ├── option_b_phoenix.py     # Phoenix: local SDK-level tracing + LLM-as-judge eval
+    └── Evals.md                # Explainer: observability vs eval, trace anatomy, eval types
 ```
