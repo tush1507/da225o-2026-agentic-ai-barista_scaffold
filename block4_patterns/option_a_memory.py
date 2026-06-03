@@ -9,7 +9,7 @@ and personalises the greeting and default drink before OrderAgent runs.
 Concept demonstrated: external memory store as a tool.
 
 Run:
-    python block4_capstone/option_a_memory.py
+    python block4_patterns/option_a_memory.py
 """
 
 import json

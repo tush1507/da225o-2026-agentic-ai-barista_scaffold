@@ -8,7 +8,7 @@ and BillingAgent reads it to compute the final price.
 Concept demonstrated: agents sharing state — one writes, another reads.
 
 Run:
-    python block4_capstone/option_b_surge.py
+    python block4_patterns/option_b_surge.py
 """
 
 import json

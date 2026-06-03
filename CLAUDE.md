@@ -26,9 +26,9 @@ python block2_sdk/agent_loop.py
 python block3_langgraph/run.py
 
 # Block 4 — pick one capstone option
-python block4_capstone/option_a_memory.py
-python block4_capstone/option_b_surge.py
-python block4_capstone/option_c_parallel.py
+python block4_patterns/option_a_memory.py
+python block4_patterns/option_b_surge.py
+python block4_patterns/option_c_parallel.py
 ```
 
 `block3_langgraph/run.py` uses bare imports (`from state import ...`, `from graph import ...`). Python adds the script's own directory to `sys.path` at startup, so running via `python block3_langgraph/run.py` from the repo root works correctly.

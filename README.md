@@ -17,13 +17,15 @@ cp .env.example .env
 barista_scaffold/
 ├── block1_concepts/        # No code needed — concepts only
 ├── block2_sdk/
-│   └── agent_loop.py       # Raw Anthropic SDK agent loop
+│   ├── agent_loop.py           # Raw Anthropic SDK agent loop
+│   ├── agent_loop_mcp.py       # Same loop, tools served via MCP
+│   └── barista_mcp_server.py   # MCP server exposing barista tools
 ├── block3_langgraph/
 │   ├── state.py            # Shared BaristaState definition
 │   ├── agents.py           # OrderAgent, InventoryAgent, BillingAgent
 │   ├── graph.py            # LangGraph StateGraph wiring
 │   └── run.py              # Entry point
-└── block4_capstone/
+└── block4_patterns/
     ├── option_a_memory.py  # PreferenceAgent — long-term memory
     ├── option_b_surge.py   # SurgeAgent — dynamic tool + shared state
     └── option_c_parallel.py# Nutrition ∥ Inventory fan-out
@@ -31,14 +33,17 @@ barista_scaffold/
 
 ### Running each block
 ```bash
-# Block 2
+# Block 2 — raw SDK
 python block2_sdk/agent_loop.py
+
+# Block 2 — MCP version (server is launched automatically)
+python block2_sdk/agent_loop_mcp.py
 
 # Block 3
 python block3_langgraph/run.py
 
 # Block 4 — pick one
-python block4_capstone/option_a_memory.py
-python block4_capstone/option_b_surge.py
-python block4_capstone/option_c_parallel.py
+python block4_patterns/option_a_memory.py
+python block4_patterns/option_b_surge.py
+python block4_patterns/option_c_parallel.py
 ```

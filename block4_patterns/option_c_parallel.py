@@ -10,7 +10,7 @@ by adding multiple edges from one node to many.
 Concept demonstrated: parallel agent execution + result merging.
 
 Run:
-    python block4_capstone/option_c_parallel.py
+    python block4_patterns/option_c_parallel.py
 """
 
 import json
