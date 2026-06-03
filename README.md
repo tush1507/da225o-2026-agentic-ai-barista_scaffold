@@ -1,5 +1,5 @@
 # Agent Orchestration Protocols — Starter Code Scaffold
-## CCE Proficiency: Agentic AI Engineering
+## Agentic AI Engineering
 
 ### Setup
 ```bash
