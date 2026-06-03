@@ -24,11 +24,13 @@ barista_scaffold/
 │   ├── state.py            # Shared BaristaState definition
 │   ├── agents.py           # OrderAgent, InventoryAgent, BillingAgent
 │   ├── graph.py            # LangGraph StateGraph wiring
-│   └── run.py              # Entry point
+│   ├── run.py              # Entry point
+│   └── LangGraph.md        # Concept explainer
 └── block4_patterns/
     ├── option_a_memory.py  # PreferenceAgent — long-term memory
     ├── option_b_surge.py   # SurgeAgent — dynamic tool + shared state
-    └── option_c_parallel.py# Nutrition ∥ Inventory fan-out
+    ├── option_c_parallel.py# Nutrition ∥ Inventory fan-out
+    └── Patterns.md         # Concept explainer
 ```
 
 ### Running each block
