@@ -1,11 +1,26 @@
 """
 Block 2 — MCP Server: Barista Tools
 -------------------------------------
-This is the server side of MCP. It exposes the same three barista tools
-(get_menu, check_inventory, place_order) via the Model Context Protocol.
+This is the SERVER side of MCP. Compare it with agent_loop.py carefully:
 
-The server communicates over stdio — agent_loop_mcp.py spawns it as a
-subprocess and talks to it through that pipe.
+  agent_loop.py                     barista_mcp_server.py
+  ─────────────────────────────     ──────────────────────────────────
+  TOOLS = [{name, description,      @mcp.tool() decorator on a function
+            input_schema}]          (schema generated automatically)
+
+  dispatch_tool(name, input)        FastMCP routes calls to the right
+  → manual if/elif routing          decorated function automatically
+
+  Tool result returned as           Tool result returned as MCP content
+  json.dumps(dict)                  (FastMCP serialises the dict for you)
+
+The business logic (MENU, INVENTORY, the three functions) is IDENTICAL
+to agent_loop.py. MCP changes only the transport and schema generation,
+not what the tools actually do.
+
+Transport: stdio (stdin/stdout pipe between client and server process).
+The server is spawned once per session by agent_loop_mcp.py and stays
+alive for the entire interactive session.
 
 You do NOT run this file directly. It is launched automatically by
 agent_loop_mcp.py.
@@ -64,6 +79,15 @@ ORDER_COUNTER = [1000]
 
 
 # ── Tools — decorated functions become MCP tools automatically ────────────────
+#
+# @mcp.tool() does three things:
+#   1. Registers the function as a tool the client can discover via list_tools()
+#   2. Generates the input_schema automatically from the function's type hints
+#   3. Generates the tool description from the function's docstring
+#
+# Compare this to agent_loop.py where you write the schema dict by hand.
+# The trade-off: @mcp.tool() is less code but gives you less control over
+# the exact schema (e.g. you can't add "enum" constraints without extra work).
 
 @mcp.tool()
 def get_menu(category: str = "all") -> dict:

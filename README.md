@@ -19,7 +19,8 @@ barista_scaffold/
 ├── block2_sdk/
 │   ├── agent_loop.py           # Raw Anthropic SDK agent loop
 │   ├── agent_loop_mcp.py       # Same loop, tools served via MCP
-│   └── barista_mcp_server.py   # MCP server exposing barista tools
+│   ├── barista_mcp_server.py   # MCP server exposing barista tools
+│   └── AgentLoop.md            # Concept explainer
 ├── block3_langgraph/
 │   ├── state.py            # Shared BaristaState definition
 │   ├── agents.py           # OrderAgent, InventoryAgent, BillingAgent
