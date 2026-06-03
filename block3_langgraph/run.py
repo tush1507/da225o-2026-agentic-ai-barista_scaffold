@@ -3,6 +3,16 @@ Block 3 — LangGraph: Entry Point
 -----------------------------------
 Run this to see the full multi-agent barista in action.
 
+Block 2 comparison:
+  In Block 2, the entry point was run_barista_agent() — one function that
+  contained the entire agent loop, tool dispatch, and state management.
+  Invoking it meant starting that loop from scratch every time.
+
+  Here the entry point calls app.invoke(initial_state) on the compiled graph.
+  The graph handles execution order, state passing, and routing internally.
+  This file only needs to know the shape of the initial state — it has no
+  knowledge of which agents exist or how they are connected.
+
 Run:
     python block3_langgraph/run.py
 """
@@ -18,6 +28,9 @@ def run(user_request: str):
     print(f"User: {user_request}")
     print(f"{'='*60}")
 
+    # In Block 2, state was implicit — just the messages list inside the loop.
+    # Here we construct the full state explicitly before handing it to the graph.
+    # Every field starts as None; each agent fills in only the fields it owns.
     initial_state: BaristaState = {
         "user_request": user_request,
         "drink_name": None,

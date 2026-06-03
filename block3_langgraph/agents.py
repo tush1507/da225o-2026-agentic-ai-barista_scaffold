@@ -4,8 +4,19 @@ Block 3 — LangGraph: Specialist Agents
 Each agent is a function that receives BaristaState
 and returns a partial state update (a dict).
 
-Key insight: each agent is ONE Claude call with its own
-system prompt, tools, and single responsibility.
+Block 2 comparison:
+  In Block 2, run_barista_agent() was one function with one system prompt
+  and one tool list handling everything — menu browsing, inventory, billing.
+  Adding a new capability meant editing that single function and its tool list,
+  risking regressions in unrelated behaviour.
+
+  Here each agent has:
+    - Its own system prompt  → focused, shorter context, less confusion
+    - Its own tool list      → only the tools it needs
+    - Its own responsibility → easy to swap, extend, or test in isolation
+
+  The agents never call each other directly. They communicate only through
+  BaristaState — one writes a field, the next reads it.
 """
 
 import json
@@ -20,6 +31,9 @@ MODEL = "claude-sonnet-4-6"
 
 
 # ── Shared tool implementations (same as Block 2) ────────────────────────────
+# The underlying data and tool functions are identical to Block 2.
+# What changed is not the tools themselves but how they are organised:
+# each agent gets only the tools it needs rather than one agent holding all of them.
 
 MENU = {
     "hot": ["Espresso", "Cappuccino", "Latte", "Flat White", "Americano"],
@@ -84,6 +98,12 @@ def order_agent(state: BaristaState) -> dict:
     """
     Responsibility: Parse the user request into a structured order.
     Output: drink_name, size, milk, order_valid, order_error
+
+    Block 2 comparison:
+      In Block 2, the single agent handled parsing AND inventory AND billing
+      in one loop with one system prompt. Here OrderAgent only parses — it
+      calls parse_order as a structured tool to force a typed output, then
+      returns that as a partial state update. It never touches inventory or billing.
     """
     print("\n[OrderAgent] Parsing request...")
 
@@ -171,6 +191,14 @@ def inventory_agent(state: BaristaState) -> dict:
     """
     Responsibility: Verify the ordered drink is in stock.
     Output: in_stock, stock_error
+
+    Block 2 comparison:
+      In Block 2, inventory was checked inside dispatch_tool() — a Python
+      function call hidden from the orchestration logic. The LLM saw the result
+      only as a tool message in its history; nothing outside the loop could
+      inspect whether the item was in stock without re-reading the messages.
+      Here, the result is written to state["in_stock"] — a typed, inspectable
+      field that the routing function in graph.py reads directly.
     """
     print(f"\n[InventoryAgent] Checking stock for: {state['drink_name']}")
 
@@ -251,6 +279,13 @@ def billing_agent(state: BaristaState) -> dict:
     """
     Responsibility: Compute price, apply any discounts, confirm the order.
     Output: price, discount, final_price, order_id, response
+
+    Block 2 comparison:
+      In Block 2, billing logic didn't exist as a separate concern — the single
+      agent produced a final text response with no structured price fields.
+      Here BillingAgent reads drink_name, size, and milk from state (written by
+      OrderAgent) without those values ever being passed as function arguments.
+      Agents are decoupled: OrderAgent doesn't need to know BillingAgent exists.
     """
     print(f"\n[BillingAgent] Computing bill for {state['size']} {state['drink_name']}...")
 
