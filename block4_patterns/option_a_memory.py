@@ -1,12 +1,22 @@
 """
-Block 4 — Capstone Option A: Memory Pattern
-----------------------------------------------
-Pattern: Long-term memory across sessions.
+Block 4 — Pattern A: Long-term Memory
+---------------------------------------
+Pattern: Persist knowledge across sessions using an external memory store.
 
-PreferenceAgent reads a persistent user profile (simulated with a JSON file)
-and personalises the greeting and default drink before OrderAgent runs.
+Block 3 comparison:
+  Block 3's pipeline is stateless — every invocation starts from scratch.
+  The agents have no idea whether this is the customer's first visit or
+  their fiftieth. This pattern adds a PreferenceAgent that runs BEFORE
+  the order pipeline, loads a user profile from an external store, and
+  enriches the state so downstream agents can personalise their behaviour.
 
-Concept demonstrated: external memory store as a tool.
+  In Block 3, BaristaState had no concept of a user or history.
+  Here, BaristaStateWithMemory adds user_id, preferences, and
+  personalized_greeting — fields that only make sense across sessions.
+
+  The memory store (JSON file here, could be Redis/SQLite/vector DB)
+  is accessed as a TOOL, not a direct import. This means the agent code
+  doesn't change when you swap the backing store.
 
 Run:
     python block4_patterns/option_a_memory.py
@@ -27,6 +37,9 @@ client = anthropic.Anthropic()
 MODEL = "claude-sonnet-4-6"
 
 # ── Memory store (JSON file simulates a vector store / database) ──────────────
+# Block 3 comparison: Block 3 had no persistence layer at all. State existed
+# only for the lifetime of one app.invoke() call. These two functions are the
+# only thing that changes when you swap storage backends — the agents are untouched.
 
 MEMORY_FILE = Path(tempfile.gettempdir()) / "barista_preferences.json"
 
@@ -48,12 +61,18 @@ def save_preferences(user_id: str, prefs: dict):
 
 
 # ── Extended state with memory fields ────────────────────────────────────────
+# Block 3 comparison: Block 3's BaristaState started with user_request and
+# nothing else. Here we extend the state with session-aware fields:
+#   user_id           — identifies the customer across visits
+#   preferences       — profile loaded from the store before ordering begins
+#   personalized_greeting — written by PreferenceAgent, read by OrderAgent
+# All other fields (drink_name, size, milk, response) are unchanged from Block 3.
 
 class BaristaStateWithMemory(TypedDict):
     user_id: str
     user_request: str
-    preferences: Optional[dict]      # loaded from memory store
-    personalized_greeting: Optional[str]
+    preferences: Optional[dict]      # loaded from memory store by PreferenceAgent
+    personalized_greeting: Optional[str]  # written by PreferenceAgent
     drink_name: Optional[str]
     size: Optional[str]
     milk: Optional[str]
@@ -96,6 +115,11 @@ def preference_agent(state: BaristaStateWithMemory) -> dict:
     """
     Loads memory, generates a personalised greeting, suggests defaults.
     Runs BEFORE OrderAgent — enriches the state before ordering begins.
+
+    Block 3 comparison: Block 3 had no pre-processing node. The graph went
+    straight to OrderAgent. Here we insert PreferenceAgent as a first node
+    that enriches state before any ordering logic runs. This is the
+    "pre-processing agent" pattern — add context before the main pipeline.
     """
     print(f"\n[PreferenceAgent] Loading preferences for user: {state['user_id']}")
     prefs = load_preferences(state["user_id"])
@@ -133,7 +157,14 @@ def preference_agent(state: BaristaStateWithMemory) -> dict:
 def order_and_save_agent(state: BaristaStateWithMemory) -> dict:
     """
     Simplified order node that also saves preferences after ordering.
-    In production this would call OrderAgent + BillingAgent as before.
+    In production this would call the full Block 3 OrderAgent + BillingAgent pipeline.
+
+    Block 3 comparison: Block 3's OrderAgent only parsed the request and wrote
+    drink_name/size/milk to state. Here the order node does two additional things:
+      1. Reads state["preferences"] to fill in defaults (e.g. preferred milk)
+         when the user says "the usual" — behaviour Block 3 couldn't support.
+      2. Saves updated preferences back to the store after every order, so
+         the next session starts with fresh data.
     """
     print(f"\n[OrderAgent+Memory] Processing: {state['user_request']}")
 

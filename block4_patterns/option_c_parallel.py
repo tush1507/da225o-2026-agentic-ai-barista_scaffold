@@ -1,13 +1,22 @@
 """
-Block 4 — Capstone Option C: Parallel Fan-out
------------------------------------------------
-Pattern: Fire InventoryAgent and NutritionAgent simultaneously.
-Orchestrator waits for both, merges results, then bills.
+Block 4 — Pattern C: Parallel Fan-out
+---------------------------------------
+Pattern: Fork execution into independent branches, then merge results.
 
-LangGraph supports parallel execution natively via Send() or
-by adding multiple edges from one node to many.
+Block 3 comparison:
+  Block 3's pipeline was strictly sequential — OrderAgent finished, then
+  InventoryAgent started, then BillingAgent. But InventoryAgent and
+  NutritionAgent are completely independent: neither needs the other's
+  output, and neither modifies shared fields the other reads.
+  Running them sequentially wastes time equal to one full agent round-trip.
 
-Concept demonstrated: parallel agent execution + result merging.
+  This pattern adds a fan_out node that forks to both agents simultaneously.
+  LangGraph detects that two edges leave fan_out and two edges arrive at
+  merge_and_bill — it runs the middle nodes in parallel and automatically
+  waits for both before allowing merge_and_bill to proceed.
+
+  No threading code, no asyncio, no explicit synchronisation — just two
+  add_edge calls and LangGraph handles the rest.
 
 Run:
     python block4_patterns/option_c_parallel.py
@@ -27,6 +36,12 @@ MODEL = "claude-sonnet-4-6"
 
 
 # ── State ─────────────────────────────────────────────────────────────────────
+# Block 3 comparison: Block 3's BaristaState only needed one agent's output
+# at a time — each node wrote and the next read sequentially.
+# Here both parallel agents write to the SAME state object simultaneously.
+# LangGraph merges their partial updates before handing state to merge_and_bill,
+# so that node sees both in_stock (from InventoryAgent) AND nutrition_summary
+# (from NutritionAgent) already populated.
 
 class BaristaStateParallel(TypedDict):
     user_request: str
@@ -90,7 +105,14 @@ def _canonical(name: str) -> str:
 # ── InventoryAgent ────────────────────────────────────────────────────────────
 
 def inventory_agent(state: BaristaStateParallel) -> dict:
-    """Check stock. In parallel execution, this runs concurrently with NutritionAgent."""
+    """
+    Check stock. Runs concurrently with NutritionAgent — no changes needed
+    to this function to make it parallel. LangGraph handles the scheduling.
+
+    Block 3 comparison: identical responsibility to Block 3's inventory_agent.
+    The only difference is that it now runs at the same time as NutritionAgent
+    instead of after OrderAgent completes. The function itself is unchanged.
+    """
     drink = _canonical(state["drink_name"])
     print(f"[InventoryAgent] Checking stock for {drink}...")
     time.sleep(0.3)  # simulate async I/O
@@ -180,8 +202,14 @@ def nutrition_agent(state: BaristaStateParallel) -> dict:
 
 def merge_and_bill(state: BaristaStateParallel) -> dict:
     """
-    This node runs only after BOTH InventoryAgent and NutritionAgent complete.
-    LangGraph ensures both upstream nodes have written to state before this runs.
+    Runs only after BOTH parallel agents complete — LangGraph guarantees this.
+    By the time this node executes, state already contains in_stock (from
+    InventoryAgent) and nutrition_summary (from NutritionAgent).
+
+    Block 3 comparison: Block 3 had no merge node — each agent handed off to
+    the next in a chain. The merge node is a new concept that only appears when
+    you have parallel branches. Its job is to combine the partial results and
+    make a single decision (bill or reject) based on all of them.
     """
     print(f"\n[MergeAndBill] Merging parallel results...")
     print(f"  Stock: {state['stock_message']}")
@@ -237,11 +265,14 @@ def build_parallel_graph():
 
     graph.set_entry_point("fan_out")
 
-    # Fork: fan_out → both inventory and nutrition simultaneously
+    # Fork: two edges FROM the same node triggers parallel execution.
+    # Block 3 comparison: Block 3 only ever had one edge leaving each node.
+    # Adding a second edge here is all it takes to go parallel — no other changes.
     graph.add_edge("fan_out", "inventory")
     graph.add_edge("fan_out", "nutrition")
 
-    # Join: both must complete before merge_and_bill
+    # Join: two edges TO the same node creates an implicit barrier.
+    # LangGraph will not execute merge_and_bill until ALL incoming edges are satisfied.
     graph.add_edge("inventory", "merge_and_bill")
     graph.add_edge("nutrition", "merge_and_bill")
 

@@ -1,11 +1,22 @@
 """
-Block 4 — Capstone Option B: Dynamic Tool + Shared State
-----------------------------------------------------------
-Pattern: SurgeAgent reads a live tool (queue length),
-writes a surge multiplier to shared state,
-and BillingAgent reads it to compute the final price.
+Block 4 — Pattern B: Dynamic Tool + Shared State
+--------------------------------------------------
+Pattern: One agent reads live data and writes a signal to state;
+a downstream agent reads that signal without knowing where it came from.
 
-Concept demonstrated: agents sharing state — one writes, another reads.
+Block 3 comparison:
+  Block 3's BillingAgent hardcoded a 10% loyalty discount — static pricing
+  baked directly into the agent's system prompt. There was no way to inject
+  live data (demand, weather, time of day) without editing BillingAgent itself.
+
+  This pattern introduces SurgeAgent as a dedicated node that runs BEFORE
+  BillingAgent. It reads a live tool (queue length), decides a multiplier,
+  and writes surge_multiplier to state. BillingAgent reads that field and
+  applies it — it has no knowledge that SurgeAgent exists or how the
+  multiplier was calculated.
+
+  This is the "signal injection" pattern: decouple the source of a business
+  rule from the agent that applies it, using state as the handoff.
 
 Run:
     python block4_patterns/option_b_surge.py
@@ -25,6 +36,11 @@ MODEL = "claude-sonnet-4-6"
 
 
 # ── Extended state with surge field ──────────────────────────────────────────
+# Block 3 comparison: Block 3's BaristaState had price/discount fields but
+# they were computed internally by BillingAgent with no external input.
+# Here we add queue_length, surge_multiplier, and surge_reason — fields owned
+# by SurgeAgent. BillingAgent reads surge_multiplier without needing to know
+# how it was determined or which agent wrote it.
 
 class BaristaStateWithSurge(TypedDict):
     user_request: str
@@ -85,6 +101,12 @@ def surge_agent(state: BaristaStateWithSurge) -> dict:
     """
     Reads live queue length → decides surge multiplier → writes to state.
     BillingAgent will read surge_multiplier from state.
+
+    Block 3 comparison: Block 3 had no equivalent node. This is a new type
+    of agent — not one that processes an order, but one that enriches the
+    state with a live signal before a downstream agent needs it.
+    Notice it uses the same while-loop pattern as Block 2/3 agents, but its
+    only job is to call get_queue_length and set_surge_pricing. Single responsibility.
     """
     print(f"\n[SurgeAgent] Checking queue demand...")
 
@@ -153,7 +175,13 @@ def surge_agent(state: BaristaStateWithSurge) -> dict:
 def billing_agent_with_surge(state: BaristaStateWithSurge) -> dict:
     """
     Reads surge_multiplier from state — written by SurgeAgent.
+
+    Block 3 comparison: Block 3's BillingAgent called calculate_price and
+    apply_discount as tools with hardcoded values. This version skips those
+    tool calls and reads surge_multiplier directly from state — no LLM call
+    needed for the pricing logic itself, because SurgeAgent already did that work.
     This is the key teaching point: agents communicate via state, not direct calls.
+    BillingAgent doesn't import SurgeAgent, call it, or even know it exists.
     """
     print(f"\n[BillingAgent] Computing price with surge: {state['surge_multiplier']}x")
 
