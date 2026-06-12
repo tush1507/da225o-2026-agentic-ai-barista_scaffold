@@ -3,3 +3,6 @@
 __pycache__/
 *.pyc
 CLAUDE.md
+block5_evals/make_traces.py
+block5_evals/traces_for_coding.md
+block5_evals/traces_report.md
