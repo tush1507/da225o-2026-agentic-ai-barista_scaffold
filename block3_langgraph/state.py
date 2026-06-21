@@ -39,6 +39,9 @@ class BaristaState(TypedDict):
     in_stock: Optional[bool]
     stock_error: Optional[str]
 
+    # Written by LoyaltyAgent — discount percentage to apply at billing.
+    discount_pct: Optional[float]
+
     # Written by BillingAgent.
     # These values are now first-class fields, not buried in a text response.
     price: Optional[float]

@@ -32,6 +32,8 @@ schemas and call tools interactively. Useful for understanding exactly what
 schema FastMCP auto-generates from @mcp.tool() decorators.
 """
 
+import random
+
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("Barista")
@@ -143,6 +145,16 @@ def place_order(drink_name: str, size: str, milk: str = "whole") -> dict:
         "milk": milk,
         "message": f"Order placed! Your {size} {drink_name} with {milk} milk will be ready shortly.",
     }
+
+
+@mcp.tool()
+def get_wait_time() -> dict:
+    """Returns the estimated wait time in minutes for a new order.
+
+    Call this after placing an order to inform the customer of their wait.
+    """
+    minutes = random.randint(5, 15)
+    return {"wait_minutes": minutes, "message": f"Estimated wait: {minutes} minutes."}
 
 
 if __name__ == "__main__":

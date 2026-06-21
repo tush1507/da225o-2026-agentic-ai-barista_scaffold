@@ -34,6 +34,8 @@ Run:
 
 import json
 import random
+import time
+from collections import defaultdict
 from langgraph.graph import StateGraph, END
 from typing import TypedDict, Optional, Literal
 import anthropic
@@ -66,8 +68,11 @@ MAX_SANE_PRICE = 200.0  # any order above this is flagged by the output guardrai
 
 class BaristaStateGuardrails(TypedDict):
     user_request: str
+    user_id: str   # needed by rate-limit guardrail
 
     # Guardrail fields (written by guardrail nodes only)
+    rate_limit_status: Optional[Literal["pass", "fail"]]
+    rate_limit_reason: Optional[str]
     input_guardrail_status: Optional[Literal["pass", "fail"]]
     input_guardrail_reason: Optional[str]
     output_guardrail_status: Optional[Literal["pass", "fail"]]
@@ -86,6 +91,40 @@ class BaristaStateGuardrails(TypedDict):
 
     # Final customer-facing response
     response: Optional[str]
+
+
+# ── Exercise: RateLimitGuardrail ──────────────────────────────────────────────
+# Runs BEFORE InputGuardrail. Rejects if a user exceeds 5 requests per minute.
+# Uses an in-memory dict — swap for Redis in production without touching any
+# other node. Same independent-node pattern as all other guardrails.
+
+RATE_LIMIT_MAX = 5
+RATE_LIMIT_WINDOW = 60  # seconds
+_request_log: dict = defaultdict(list)  # user_id → [timestamps]
+
+
+def rate_limit_guardrail(state: BaristaStateGuardrails) -> dict:
+    user_id = state.get("user_id", "anonymous")
+    now = time.time()
+    window_start = now - RATE_LIMIT_WINDOW
+
+    # Purge timestamps outside the window, then record this request.
+    _request_log[user_id] = [t for t in _request_log[user_id] if t > window_start]
+    _request_log[user_id].append(now)
+
+    count = len(_request_log[user_id])
+    print(f"\n[RateLimitGuardrail] User '{user_id}': {count}/{RATE_LIMIT_MAX} requests in last 60s")
+
+    if count > RATE_LIMIT_MAX:
+        return {
+            "rate_limit_status": "fail",
+            "rate_limit_reason": f"Too many requests ({count} in 60s). Please wait a moment.",
+        }
+    return {"rate_limit_status": "pass", "rate_limit_reason": None}
+
+
+def route_after_rate_limit(state: BaristaStateGuardrails) -> str:
+    return "input_guardrail" if state["rate_limit_status"] == "pass" else "end_rejected"
 
 
 # ── InputGuardrail ────────────────────────────────────────────────────────────
@@ -248,9 +287,10 @@ def billing_agent(state: BaristaStateGuardrails) -> dict:
     final = round(base * quantity, 2)
     order_id = f"ORD-GRD-{random.randint(1000, 9999)}"
 
+    item = f"{quantity}x " if quantity > 1 else ""
     response = (
-        f"Order confirmed: {quantity}x {state['size']} {state['drink_name']} "
-        f"with {state['milk']} milk. Total: ${final:.2f} (Order #{order_id})"
+        f"Wonderful! {item}{state['size']} {state['drink_name']} with {state['milk']} milk — "
+        f"that'll be ${final:.2f}. Your order number is {order_id}."
     )
     print(f"[BillingAgent] {response}")
     return {"base_price": round(base, 2), "final_price": final, "order_id": order_id, "response": response}
@@ -377,9 +417,13 @@ def route_after_output_guardrail(state: BaristaStateGuardrails) -> str:
 # ── Terminal nodes ────────────────────────────────────────────────────────────
 
 def end_rejected(state: BaristaStateGuardrails) -> dict:
-    """Input was rejected by InputGuardrail — return a safe user-facing message."""
-    reason = state.get("input_guardrail_reason", "Request could not be processed.")
-    response = f"Sorry, I can't process that request. {reason}"
+    """Rejected by RateLimitGuardrail or InputGuardrail — surface whichever fired."""
+    reason = (
+        state.get("rate_limit_reason")
+        or state.get("input_guardrail_reason")
+        or "Request could not be processed."
+    )
+    response = f"Hmm, I wasn't able to take that order. {reason} Feel free to try again!"
     print(f"\n[Rejected] {response}")
     return {"response": response}
 
@@ -388,7 +432,7 @@ def end_anomaly(state: BaristaStateGuardrails) -> dict:
     """OutputGuardrail detected an anomaly — replace the broken response with a safe fallback."""
     reason = state.get("output_guardrail_reason", "Unexpected issue.")
     print(f"\n[Anomaly] Flagged: {reason}")
-    return {"response": "Something went wrong with your order. Please try again or speak to a staff member."}
+    return {"response": "Something doesn't look right on our end — could you try again? A staff member is happy to help too."}
 
 
 def end_ok(state: BaristaStateGuardrails) -> dict:
@@ -417,6 +461,7 @@ def end_ok(state: BaristaStateGuardrails) -> dict:
 def build_guardrails_graph():
     graph = StateGraph(BaristaStateGuardrails)
 
+    graph.add_node("rate_limit", rate_limit_guardrail)  # exercise: first gate
     graph.add_node("input_guardrail", input_guardrail)
     graph.add_node("order", order_agent)
     graph.add_node("billing", billing_agent)
@@ -425,7 +470,13 @@ def build_guardrails_graph():
     graph.add_node("end_anomaly", end_anomaly)
     graph.add_node("end_ok", end_ok)
 
-    graph.set_entry_point("input_guardrail")
+    graph.set_entry_point("rate_limit")
+
+    graph.add_conditional_edges(
+        "rate_limit",
+        route_after_rate_limit,
+        {"input_guardrail": "input_guardrail", "end_rejected": "end_rejected"},
+    )
 
     graph.add_conditional_edges(
         "input_guardrail",
@@ -460,6 +511,9 @@ if __name__ == "__main__":
         print(f"{'='*60}")
         state = app.invoke({
             "user_request": user_request,
+            "user_id": "demo_user",
+            "rate_limit_status": None,
+            "rate_limit_reason": None,
             "input_guardrail_status": None,
             "input_guardrail_reason": None,
             "output_guardrail_status": None,

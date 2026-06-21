@@ -13,7 +13,7 @@ Key concepts demonstrated:
 
 from langgraph.graph import StateGraph, END
 from state import BaristaState
-from agents import order_agent, inventory_agent, billing_agent
+from agents import order_agent, inventory_agent, loyalty_agent, billing_agent
 
 
 # ── Routing functions (conditional edge logic) ───────────────────────────────
@@ -47,7 +47,7 @@ def route_after_inventory(state: BaristaState) -> str:
     # Extracting it here makes the "what happens after inventory check?" question
     # answerable by reading one small function instead of scanning the whole loop.
     if state.get("in_stock"):
-        return "billing"  # → BillingAgent
+        return "loyalty"  # → LoyaltyAgent (then on to BillingAgent)
     else:
         return "end_unavailable"  # → END with out-of-stock message
 
@@ -86,6 +86,7 @@ def build_barista_graph() -> StateGraph:
     # Block 2 had one agent doing everything; here each agent has one job.
     graph.add_node("order", order_agent)
     graph.add_node("inventory", inventory_agent)
+    graph.add_node("loyalty", loyalty_agent)
     graph.add_node("billing", billing_agent)
     graph.add_node("end_invalid", handle_invalid_order)
     graph.add_node("end_unavailable", handle_unavailable)
@@ -109,12 +110,13 @@ def build_barista_graph() -> StateGraph:
         "inventory",
         route_after_inventory,
         {
-            "billing": "billing",
+            "loyalty": "loyalty",
             "end_unavailable": "end_unavailable",
         },
     )
 
     # Linear edges — no decision needed, always go to END.
+    graph.add_edge("loyalty", "billing")
     graph.add_edge("billing", END)
     graph.add_edge("end_invalid", END)
     graph.add_edge("end_unavailable", END)
@@ -134,7 +136,7 @@ def print_graph_structure():
     print("     ↓")
     print("  [OrderAgent]")
     print("     ├── valid=True   → [InventoryAgent]")
-    print("     │                       ├── in_stock=True  → [BillingAgent] → [END]")
+    print("     │                       ├── in_stock=True  → [LoyaltyAgent] → [BillingAgent] → [END]")
     print("     │                       └── in_stock=False → [end_unavailable] → [END]")
     print("     └── valid=False  → [end_invalid] → [END]")
     print()

@@ -58,6 +58,9 @@ class BaristaStateParallel(TypedDict):
     caffeine_mg: Optional[int]
     nutrition_summary: Optional[str]
 
+    # Set by AllergenAgent (exercise)
+    allergen_warning: Optional[str]
+
     # Set by BillingAgent (after merge)
     final_price: Optional[float]
     order_id: Optional[str]
@@ -198,6 +201,30 @@ def nutrition_agent(state: BaristaStateParallel) -> dict:
                 }
 
 
+# ── Exercise: AllergenAgent (third parallel branch) ──────────────────────────
+# Runs concurrently with InventoryAgent and NutritionAgent.
+# Zero changes to those two agents — just two add_edge calls in the graph.
+
+ALLERGENS = {
+    "whole":  ["dairy"],
+    "oat":    [],
+    "almond": ["tree nuts"],
+    "soy":    ["soy"],
+    "none":   [],
+}
+
+
+def allergen_agent(state: BaristaStateParallel) -> dict:
+    milk = state.get("milk", "whole")
+    warnings = ALLERGENS.get(milk, [])
+    if warnings:
+        msg = f"Contains: {', '.join(warnings)}."
+    else:
+        msg = "No common allergens detected."
+    print(f"[AllergenAgent] Milk '{milk}' — {msg}")
+    return {"allergen_warning": msg}
+
+
 # ── Merge + Bill node (runs after both parallel agents complete) ──────────────
 
 def merge_and_bill(state: BaristaStateParallel) -> dict:
@@ -214,10 +241,11 @@ def merge_and_bill(state: BaristaStateParallel) -> dict:
     print(f"\n[MergeAndBill] Merging parallel results...")
     print(f"  Stock: {state['stock_message']}")
     print(f"  Nutrition: {state['nutrition_summary']}")
+    print(f"  Allergens: {state['allergen_warning']}")
 
     if not state["in_stock"]:
         return {
-            "response": f"Sorry! {state['stock_message']} Please choose another drink.",
+            "response": f"Oh no — {state['stock_message']} Can I get you something else?",
             "final_price": None,
             "order_id": None,
         }
@@ -227,9 +255,9 @@ def merge_and_bill(state: BaristaStateParallel) -> dict:
     order_id = f"ORD-PAR-{hash(state['drink_name']) % 9000 + 1000}"
 
     response = (
-        f"Order confirmed: {state['size']} {state['drink_name']} with {state['milk']} milk.\n"
-        f"Price: ${final:.2f}\n"
-        f"Nutrition: {state['nutrition_summary']}"
+        f"Perfect! One {state['size']} {state['drink_name']} with {state['milk']} milk for ${final:.2f}.\n"
+        f"Just so you know: {state['nutrition_summary']}.\n"
+        f"Allergen info: {state['allergen_warning']}"
     )
 
     return {"final_price": final, "order_id": order_id, "response": response}
@@ -261,20 +289,20 @@ def build_parallel_graph():
     graph.add_node("fan_out", fan_out)
     graph.add_node("inventory", inventory_agent)
     graph.add_node("nutrition", nutrition_agent)
+    graph.add_node("allergen", allergen_agent)   # exercise: third parallel branch
     graph.add_node("merge_and_bill", merge_and_bill)
 
     graph.set_entry_point("fan_out")
 
-    # Fork: two edges FROM the same node triggers parallel execution.
-    # Block 3 comparison: Block 3 only ever had one edge leaving each node.
-    # Adding a second edge here is all it takes to go parallel — no other changes.
+    # Fork: three edges from fan_out — all three run simultaneously.
     graph.add_edge("fan_out", "inventory")
     graph.add_edge("fan_out", "nutrition")
+    graph.add_edge("fan_out", "allergen")        # exercise: one new line
 
-    # Join: two edges TO the same node creates an implicit barrier.
-    # LangGraph will not execute merge_and_bill until ALL incoming edges are satisfied.
+    # Join: all three must complete before merge_and_bill runs.
     graph.add_edge("inventory", "merge_and_bill")
     graph.add_edge("nutrition", "merge_and_bill")
+    graph.add_edge("allergen", "merge_and_bill") # exercise: one new line
 
     graph.add_edge("merge_and_bill", END)
 
@@ -313,6 +341,7 @@ if __name__ == "__main__":
             "drink_name": drink, "size": size, "milk": milk,
             "in_stock": None, "stock_message": None,
             "calories": None, "caffeine_mg": None, "nutrition_summary": None,
+            "allergen_warning": None,
             "final_price": None, "order_id": None, "response": None,
         })
         elapsed = time.time() - t0

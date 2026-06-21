@@ -23,6 +23,7 @@ Run:
 """
 
 import json
+import sqlite3
 import tempfile
 from pathlib import Path
 from langgraph.graph import StateGraph, END
@@ -41,23 +42,39 @@ MODEL = "claude-sonnet-4-6"
 # only for the lifetime of one app.invoke() call. These two functions are the
 # only thing that changes when you swap storage backends — the agents are untouched.
 
-MEMORY_FILE = Path(tempfile.gettempdir()) / "barista_preferences.json"
+# ── Exercise: SQLite backend (swapped from JSON file) ─────────────────────────
+# Only these two functions changed — all agent code above and below is untouched.
+# In production, swap again to Redis or a vector DB by editing only these two.
+
+DB_FILE = Path(tempfile.gettempdir()) / "barista_preferences.db"
+
+
+def _get_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_FILE)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS preferences "
+        "(user_id TEXT PRIMARY KEY, data TEXT NOT NULL)"
+    )
+    conn.commit()
+    return conn
 
 
 def load_preferences(user_id: str) -> dict:
-    if not MEMORY_FILE.exists():
-        return {}
-    data = json.loads(MEMORY_FILE.read_text())
-    return data.get(user_id, {})
+    with _get_db() as conn:
+        row = conn.execute(
+            "SELECT data FROM preferences WHERE user_id = ?", (user_id,)
+        ).fetchone()
+    return json.loads(row[0]) if row else {}
 
 
 def save_preferences(user_id: str, prefs: dict):
-    data = {}
-    if MEMORY_FILE.exists():
-        data = json.loads(MEMORY_FILE.read_text())
-    data[user_id] = prefs
-    MEMORY_FILE.write_text(json.dumps(data, indent=2))
-    print(f"[Memory] Saved preferences for {user_id}: {prefs}")
+    with _get_db() as conn:
+        conn.execute(
+            "INSERT INTO preferences (user_id, data) VALUES (?, ?) "
+            "ON CONFLICT(user_id) DO UPDATE SET data = excluded.data",
+            (user_id, json.dumps(prefs)),
+        )
+    print(f"[Memory/SQLite] Saved preferences for {user_id}: {prefs}")
 
 
 # ── Extended state with memory fields ────────────────────────────────────────
@@ -201,8 +218,8 @@ def order_and_save_agent(state: BaristaStateWithMemory) -> dict:
 
     response = (
         f"{state['personalized_greeting']}\n\n"
-        f"Order confirmed: {size} {drink} with {milk} milk. "
-        f"(Visit #{visit_count} — thanks for coming back!)"
+        f"Got it! One {size} {drink} with {milk} milk coming right up. "
+        f"{'First visit — hope you love it!' if visit_count == 1 else f'Visit #{visit_count} — always great to see you!'}"
     )
     return {"drink_name": drink, "size": size, "milk": milk, "response": response}
 

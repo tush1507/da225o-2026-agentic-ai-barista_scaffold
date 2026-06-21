@@ -250,6 +250,22 @@ def inventory_agent(state: BaristaState) -> dict:
     return {"in_stock": False, "stock_error": "Could not verify inventory."}
 
 
+# ── LoyaltyAgent ─────────────────────────────────────────────────────────────
+
+def loyalty_agent(state: BaristaState) -> dict:
+    """
+    Responsibility: Decide the discount percentage based on drink category.
+    Output: discount_pct
+
+    No LLM needed here — pure business logic. Cold drinks get 20%, hot drinks
+    get 10%. BillingAgent reads discount_pct from state instead of hardcoding.
+    """
+    drink = state.get("drink_name", "")
+    pct = 20.0 if drink in MENU["cold"] else 10.0
+    print(f"\n[LoyaltyAgent] Applying {pct}% loyalty discount for {drink}")
+    return {"discount_pct": pct}
+
+
 # ── BillingAgent ──────────────────────────────────────────────────────────────
 
 BILLING_TOOLS = [
@@ -299,7 +315,7 @@ def billing_agent(state: BaristaState) -> dict:
             "role": "user",
             "content": (
                 f"Calculate the price for a {state['size']} {state['drink_name']} "
-                f"with {state['milk']} milk. Apply a 10% loyalty discount."
+                f"with {state['milk']} milk. Apply a {state.get('discount_pct', 10)}% loyalty discount."
             ),
         }
     ]

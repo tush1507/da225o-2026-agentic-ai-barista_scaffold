@@ -48,6 +48,7 @@ class BaristaStateWithSurge(TypedDict):
     size: str
     milk: str
     base_price: Optional[float]
+    weather_condition: Optional[str]   # written by WeatherAgent
     queue_length: Optional[int]
     surge_multiplier: Optional[float]
     surge_reason: Optional[str]
@@ -69,6 +70,21 @@ PRICES = {
     "Frappuccino": 5.0, "Iced Matcha": 4.8,
 }
 SIZE_MULTIPLIER = {"small": 0.85, "medium": 1.0, "large": 1.25}
+
+
+# ── Exercise: WeatherAgent ────────────────────────────────────────────────────
+# Runs BEFORE SurgeAgent. Writes weather_condition to state.
+# SurgeAgent reads it and applies an extra +5% multiplier when it's raining
+# (people avoid cold drinks in rain → cold drinks are less popular → we nudge
+# pricing to reflect demand). WeatherAgent never calls SurgeAgent directly.
+
+WEATHER_CONDITIONS = ["sunny", "cloudy", "raining", "sunny", "sunny"]  # weighted toward sunny
+
+
+def weather_agent(_state: BaristaStateWithSurge) -> dict:
+    condition = random.choice(WEATHER_CONDITIONS)
+    print(f"[WeatherAgent] Current weather: {condition}")
+    return {"weather_condition": condition}
 
 
 # ── SurgeAgent ────────────────────────────────────────────────────────────────
@@ -150,6 +166,11 @@ def surge_agent(state: BaristaStateWithSurge) -> dict:
                 elif block.name == "set_surge_pricing":
                     surge_multiplier = block.input["multiplier"]
                     surge_reason = block.input["reason"]
+                    # Exercise: cold drinks get +5% when raining (people want hot drinks)
+                    cold_drinks = ["Cold Brew", "Iced Latte", "Frappuccino", "Iced Matcha"]
+                    if state.get("weather_condition") == "raining" and state.get("drink_name") in cold_drinks:
+                        surge_multiplier = round(surge_multiplier * 1.05, 4)
+                        surge_reason += " (+5% cold drink rain adjustment)"
                     print(f"[SurgeAgent] Surge: {surge_multiplier}x — {surge_reason}")
                     result = json.dumps({"applied": True})
                     done = True
@@ -189,13 +210,13 @@ def billing_agent_with_surge(state: BaristaStateWithSurge) -> dict:
     surge_multiplier = state.get("surge_multiplier", 1.0)
     final = round(base * surge_multiplier, 2)
 
-    surge_note = ""
-    if surge_multiplier > 1.0:
-        surge_note = f" (includes {int((surge_multiplier - 1) * 100)}% surge: {state['surge_reason']})"
-
+    surge_note = (
+        " We're a little busy right now, so there's a small surge on your order."
+        if surge_multiplier > 1.0 else ""
+    )
     response = (
-        f"Order confirmed: {state['size']} {state['drink_name']} with {state['milk']} milk.\n"
-        f"Price: ${final:.2f}{surge_note}"
+        f"You're all set! One {state['size']} {state['drink_name']} with {state['milk']} milk "
+        f"for ${final:.2f}.{surge_note}"
     )
 
     return {
@@ -210,9 +231,11 @@ def billing_agent_with_surge(state: BaristaStateWithSurge) -> dict:
 
 def build_surge_graph():
     graph = StateGraph(BaristaStateWithSurge)
+    graph.add_node("weather", weather_agent)   # exercise: runs before surge
     graph.add_node("surge", surge_agent)
     graph.add_node("billing", billing_agent_with_surge)
-    graph.set_entry_point("surge")
+    graph.set_entry_point("weather")
+    graph.add_edge("weather", "surge")
     graph.add_edge("surge", "billing")
     graph.add_edge("billing", END)
     return graph.compile()
@@ -248,6 +271,7 @@ if __name__ == "__main__":
             "drink_name": drink,
             "size": size,
             "milk": milk,
+            "weather_condition": None,
             "base_price": None, "queue_length": None,
             "surge_multiplier": None, "surge_reason": None,
             "final_price": None, "order_id": None, "response": None,

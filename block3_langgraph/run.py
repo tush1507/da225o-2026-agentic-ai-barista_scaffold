@@ -40,6 +40,7 @@ def run(user_request: str):
         "order_error": None,
         "in_stock": None,
         "stock_error": None,
+        "discount_pct": None,
         "price": None,
         "discount": None,
         "final_price": None,

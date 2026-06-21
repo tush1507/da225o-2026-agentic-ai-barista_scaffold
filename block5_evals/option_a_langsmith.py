@@ -322,6 +322,10 @@ TEST_CASES = [
      "outputs": {"valid": False}},
     {"inputs": {"order": "medium iced matcha with soy milk"},
      "outputs": {"drink": "Iced Matcha", "size": "medium", "milk": "soy", "valid": True}},
+    # Exercise: ambiguous order — agent must pick a cold drink but we don't know which.
+    # The LLM judge should score leniently: any cold drink is acceptable.
+    {"inputs": {"order": "just something cold please"},
+     "outputs": {"valid": True, "in_stock": True, "note": "any available cold drink is acceptable"}},
 ]
 
 
@@ -369,6 +373,33 @@ def order_correctness_evaluator(run, example):
     return {"key": "order_correctness", "score": 1 if "correct" in verdict else 0}
 
 
+def response_friendliness_evaluator(run, _example):
+    """
+    Exercise: LLM-as-judge for tone — does the agent sound like a real barista?
+
+    Scores separately from correctness so you can track both independently.
+    A technically correct response can still fail this if it's robotic or curt.
+    Compare scores across prompt changes to see whether wording improvements help.
+    """
+    response = (run.outputs or {}).get("response", "")
+    if not response:
+        return {"key": "response_friendliness", "score": 0}
+
+    prompt = (
+        f"You are evaluating whether a barista agent sounds warm and human.\n\n"
+        f"Agent response:\n{response}\n\n"
+        f"Does it sound like a friendly, real barista — not a vending machine? "
+        f"Consider warmth, natural phrasing, and whether it acknowledges the customer.\n\n"
+        f"Reply with ONLY 'friendly' or 'robotic'."
+    )
+    resp = client.messages.create(
+        model=MODEL, max_tokens=10,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    verdict = resp.content[0].text.strip().lower()
+    return {"key": "response_friendliness", "score": 1 if "friendly" in verdict else 0}
+
+
 def run_evaluation():
     try:
         from langsmith import Client as LS
@@ -400,20 +431,26 @@ def run_evaluation():
     results = ls_evaluate(
         run_pipeline,
         data=dataset_name,
-        evaluators=[order_correctness_evaluator],
+        evaluators=[order_correctness_evaluator, response_friendliness_evaluator],
         experiment_prefix="barista-eval",
     )
 
-    scores = []
+    correctness, friendliness = [], []
     for r in results:
-        er = r.get("evaluation_results", {}).get("results", [])
-        if er:
-            scores.append(er[0].score)
-    if scores:
-        pct = 100 * sum(scores) / len(scores)
-        print(f"\nScore: {sum(scores)}/{len(scores)} correct ({pct:.0f}%)")
+        for er in r.get("evaluation_results", {}).get("results", []):
+            if er.key == "order_correctness":
+                correctness.append(er.score)
+            elif er.key == "response_friendliness":
+                friendliness.append(er.score)
+
+    if correctness:
+        pct = 100 * sum(correctness) / len(correctness)
+        print(f"\n  Correctness : {sum(correctness)}/{len(correctness)} ({pct:.0f}%)")
+    if friendliness:
+        pct = 100 * sum(friendliness) / len(friendliness)
+        print(f"  Friendliness: {sum(friendliness)}/{len(friendliness)} ({pct:.0f}%)")
     project = os.getenv("LANGCHAIN_PROJECT", "default")
-    print(f"[LangSmith] Full results: https://smith.langchain.com  (project: {project})")
+    print(f"\n[LangSmith] Full results: https://smith.langchain.com  (project: {project})")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

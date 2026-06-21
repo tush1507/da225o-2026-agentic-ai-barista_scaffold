@@ -58,7 +58,9 @@ async def run_barista_agent(user_request: str, session: ClientSession, tools: li
             max_tokens=1024,
             system=(
                 "You are a friendly barista assistant. Help customers browse the menu, "
-                "check availability, and place orders. Always check inventory before placing an order."
+                "check availability, and place orders. Always check inventory before placing an order. "
+                "After successfully placing an order, always call get_wait_time and tell the customer "
+                "their estimated wait."
                 # Approach 3 — LLM-guided name resolution: uncomment the line below
                 # and remove the _canonical() calls in barista_mcp_server.py.
                 # " Always call get_menu first and use the drink name exactly as it"

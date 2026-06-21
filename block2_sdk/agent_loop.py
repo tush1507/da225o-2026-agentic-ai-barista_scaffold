@@ -20,6 +20,7 @@ Run:
 """
 
 import json
+import random
 import anthropic
 from dotenv import load_dotenv
 
@@ -81,6 +82,15 @@ TOOLS = [
                 "milk": {"type": "string", "enum": ["whole", "oat", "almond", "soy", "none"]},
             },
             "required": ["drink_name", "size"],
+        },
+    },
+    {
+        "name": "get_wait_time",
+        "description": "Returns the estimated wait time in minutes for a new order. Call this after placing an order to inform the customer.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
         },
     },
 ]
@@ -158,6 +168,11 @@ def check_inventory(drink_name: str) -> dict:
     return {"drink": drink_name, "available": available}
 
 
+def get_wait_time() -> dict:
+    minutes = random.randint(5, 15)
+    return {"wait_minutes": minutes, "message": f"Estimated wait: {minutes} minutes."}
+
+
 def place_order(drink_name: str, size: str, milk: str = "whole") -> dict:
     drink_name = _canonical(drink_name)
     if not INVENTORY.get(drink_name, False):
@@ -188,6 +203,8 @@ def dispatch_tool(tool_name: str, tool_input: dict) -> str:
         result = check_inventory(**tool_input)
     elif tool_name == "place_order":
         result = place_order(**tool_input)
+    elif tool_name == "get_wait_time":
+        result = get_wait_time()
     else:
         result = {"error": f"Unknown tool: {tool_name}"}
     return json.dumps(result)
@@ -219,7 +236,9 @@ def run_barista_agent(user_request: str) -> str:
                 # The system prompt is the agent's "personality" and constraints.
                 # It does NOT change between iterations — only messages grows.
                 "You are a friendly barista assistant. Help customers browse the menu, "
-                "check availability, and place orders. Always check inventory before placing an order."
+                "check availability, and place orders. Always check inventory before placing an order. "
+                "After successfully placing an order, always call get_wait_time and tell the customer "
+                "their estimated wait."
                 # Approach 3 — LLM-guided name resolution: uncomment the line below
                 # and remove the _canonical() calls in check_inventory / place_order.
                 # " Always call get_menu first and use the drink name exactly as it"
